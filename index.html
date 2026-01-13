@@ -956,6 +956,98 @@
         }
 
         const game = new RainGame();
+
+        function spawnCharDrop() {
+            const data = DATA_BUILD[idxBuild];
+            
+            // 1. 生成逻辑
+            // 获取当前真正需要的字
+            const neededCharNow = data.correct[fillIndex]; 
+            
+            // 40% 概率生成当前急需的字，60% 生成干扰字
+            const isTarget = Math.random() < 0.4;
+            const charToShow = isTarget && neededCharNow ? neededCharNow : NOISE_CHARS[Math.floor(Math.random() * NOISE_CHARS.length)];
+
+            const el = document.createElement('div');
+            el.className = 'char-drop';
+            el.innerText = charToShow;
+            // 随机位置
+            el.style.left = Math.random() * (window.innerWidth - 50) + 'px';
+            let y = -50;
+            el.style.top = y + 'px';
+            skyBuild.appendChild(el);
+
+            const speed = Math.random() * 1.5 + 1.5;
+            const fall = setInterval(() => {
+                if (!isActive || currentMode !== 'build') { clearInterval(fall); return; }
+                y += speed;
+                el.style.transform = `translateY(${y}px)`;
+                if (y > window.innerHeight) { el.remove(); clearInterval(fall); }
+            }, 16);
+
+            // ================= 点击事件 =================
+            const clickHandler = (e) => {
+                e.preventDefault(); e.stopPropagation();
+
+                if(el.getAttribute('data-locked') === 'true') return;
+                
+                // 实时获取当前需要第几个字
+                const currentNeedIndex = fillIndex; 
+                const realTargetChar = data.correct[currentNeedIndex];
+
+                // 判断逻辑
+                if(charToShow === realTargetChar) {
+                    // --- 答对了 ---
+                    el.setAttribute('data-locked', 'true'); 
+                    if(navigator.vibrate) navigator.vibrate(30);
+                    
+                    // 特效
+                    el.style.background = "#fff"; 
+                    el.style.color = "#000"; 
+                    el.style.transform = "scale(1.5)"; 
+                    el.style.zIndex = 200;
+                    el.style.pointerEvents = "none"; 
+                    
+                    // 逻辑更新
+                    currentFilledText += charToShow;
+                    fillIndex++; 
+                    updateBuildDisplay();
+                    
+                    // 200ms后消失
+                    setTimeout(() => el.remove(), 200);
+
+                    // ============================================
+                    // 🔴 修复的核心在这里：必须字数完全够了才算过！
+                    // ============================================
+                    if(fillIndex === data.correct.length && currentFilledText.length === data.correct.length) {
+                        
+                         // 双重保险：内容必须对
+                         if(currentFilledText !== data.correct) return;
+
+                        isActive = false; 
+                        clearInterval(globalTimer);
+                        
+                        document.getElementById('build-slot').style.color = "#fff";
+                        document.getElementById('build-slot').style.textShadow = "0 0 20px #fff";
+                        
+                        setTimeout(() => {
+                            idxBuild = (idxBuild + 1) % DATA_BUILD.length;
+                            startBuild(); 
+                        }, 1000);
+                    }
+
+                } else {
+                    // --- 答错了 ---
+                    if(navigator.vibrate) navigator.vibrate([50,50,50]);
+                    el.style.background = "#f00"; 
+                    el.style.borderColor = "#f00";
+                    document.body.classList.add('shake-screen');
+                    setTimeout(()=>document.body.classList.remove('shake-screen'), 400);
+                }
+            };
+            
+            el.onmousedown = el.ontouchstart = clickHandler;
+        }
     </script>
 </body>
 </html>
